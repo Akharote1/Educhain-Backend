@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 import connection from '../services/database.js'
 
-
 const studentSchema = new mongoose.Schema({
 	name: {
 		type: String,

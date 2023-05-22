@@ -3,15 +3,38 @@ import Student from "./../models/Student.js"
 export const list = async (req, res) => {
   const limit = req.query.limit ?? 100;
   const page = req.query.page ?? 1;
+  const query = {};
 
-  const students = await Student.find().skip((page - 1) * limit).limit(limit);
-  const count = await Student.count();
+  if (req.query.query && req.query.query != '') {
+    query['$or'] = [
+      {name: {$regex: req.query.query, $options: 'i'}},
+      {uid: {$regex: req.query.query, $options: 'i'}},
+      {email: {$regex: req.query.query, $options: 'i'}},
+      {phone_number: {$regex: req.query.query, $options: 'i'}},
+    ]
+  } 
+
+  if (req.query.branch != "all") {
+    query.branch = req.query.branch;
+  }
+
+  if (req.query.batch != "all") {
+    query.batch = req.query.batch;
+  }
+
+  const students = await Student.find(query).sort({uid: 1}).skip((page - 1) * limit).limit(limit);
+  const count = await Student.count(query);
 
   res.status(200).json({
-    page,
-    students,
-    page_count: Math.ceil(count / limit),
-    total_count: count
+    pagination: {
+      current_page: page,
+      total_pages: Math.ceil(count / limit),
+      total_count: count,
+      limit,
+      start: (page - 1) * limit + 1,
+      end: Math.min(page * limit, count)
+    },
+    students
   })
 }
 
@@ -102,4 +125,27 @@ export const bulkAdd = async (req, res) => {
       message: error.toString()
     })
   }
+}
+
+export const update = async (req, res) => {
+  const student = await Student.findOne({uid: req.params.uid});
+
+  if (!student) {
+    return res.status(404).json({
+      success: false,
+      message: "Invalid UID"
+    })
+  }
+
+  student.name = req.body.name ?? student.name;
+  student.email = req.body.email ?? student.email;
+  student.phone_number = req.body.phone_number ?? student.phone_number;
+  student.branch = req.body.branch ?? student.branch;
+  student.batch = req.body.batch ?? student.batch;
+  await student.save();
+
+  res.status(200).json({
+    success: true,
+    student
+  })
 }

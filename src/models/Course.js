@@ -36,6 +36,22 @@ const enrolledStudentSchema = new mongoose.Schema({
   score_lab_ese: {
     type: Number
   },
+  grade: {
+    type: String,
+    default: 'NP',
+    enum: ['AA', 'AB', 'BB', 'BC', 'CC', 'CD', 'DD', 'FF', 'NG', 'NP', 'X'],
+    required: true
+  },
+  flag_not_present: {
+    type: Boolean,
+    default: false,
+    required: true
+  },
+  flag_defaulter: {
+    type: Boolean,
+    default: false,
+    required: true
+  },
 })
 
 const courseFacultySchema = new mongoose.Schema({
@@ -72,8 +88,13 @@ const courseSchema = new mongoose.Schema({
 		type: String,
 		required: true
 	},
-  batch: {
+  year: {
     type: Number,
+    required: true
+  },
+  semester: {
+    type: String,
+    enum: ['odd', 'even'],
     required: true
   },
   credits_theory: {
@@ -151,6 +172,12 @@ const courseSchema = new mongoose.Schema({
   },
   grades_locked_by: courseFacultySchema,
   grades_locked_at: mongoose.SchemaTypes.Date,
+  course_type: {
+    type: String,
+    enum: ['core', 'open-elective', 'program-elective', 'seva-satva', 'project', 'hss'],
+    required: true,
+    default: 'core'
+  }
 })
 
 export default connection.model('Course', courseSchema)

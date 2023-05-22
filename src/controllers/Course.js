@@ -1,30 +1,55 @@
+import { calculateGrades } from "../misc/utils.js";
 import Course from "../models/Course.js"
+import ExamResult from "../models/ExamResult.js";
 import Faculty from "../models/Faculty.js";
 import Student from "../models/Student.js";
 
 export const list = async (req, res) => {
   const limit = req.query.limit ?? 20;
   const page = req.query.page ?? 1;
+  const query = {};
 
-  let courses = await Course.find().skip((page - 1) * limit).limit(limit);
+  if (req.query.query && req.query.query != '') {
+    query['$or'] = [
+      {name: {$regex: req.query.query, $options: 'i'}},
+      {course_code: {$regex: req.query.query, $options: 'i'}}
+    ]
+  }
+
+  if (req.query.year && req.query.year != 'all') {
+    query.year = req.query.year;
+  }
+
+  let courses = await Course.find(query).skip((page - 1) * limit).limit(limit);
   courses = courses.filter(course => req.user.admin || course.faculty.some(x => x.email == req.user.email))
-  const count = await Course.count();
+  courses = courses.map(course => {
+    const out = course.toObject();
+    out.student_count = course.enrolled_students.length;
+    out.enrolled_students = undefined;
+    return out;
+  })
+  const count = await Course.count(query);
 
   res.status(200).json({
-    page,
     courses,
-    page_count: Math.ceil(count / limit),
-    total_count: count
+    pagination: {
+      current_page: page,
+      total_pages: Math.ceil(count / limit),
+      total_count: count,
+      limit,
+      start: (page - 1) * limit + 1,
+      end: Math.min(page * limit, count)
+    },
   })
 }
 
 export const get = async (req, res) => {
-  const course = await Course.findOne({batch: req.params.batch, course_code: req.params.course_code});
+  const course = await Course.findOne({year: req.params.year, semester: req.params.semester, course_code: req.params.course_code});
   
   if (!course) {
     return res.status(404).json({
       success: false,
-      message: `Could not find course ${req.params.course_code} in batch ${req.params.batch}`
+      message: `Could not find course ${req.params.course_code} in ${req.params.year}-${req.params.semester}`
     })
   }
 
@@ -36,7 +61,7 @@ export const get = async (req, res) => {
 
 export const add = async (req, res) => {
   try {
-    if (await Course.findOne({course_code: req.body.course_code, batch: req.body.batch})) {
+    if (await Course.findOne({course_code: req.body.course_code, year: req.body.year, semester: req.body.semester})) {
       return res.status(400).send({
         success: false,
         message: "A Course with that Course Code already exists in that batch"
@@ -46,9 +71,11 @@ export const add = async (req, res) => {
     const course = await Course.create({
       name: req.body.name,
       course_code: req.body.course_code,
+      course_type: req.body.course_type,
       credits_theory: req.body.credits_theory,
       credits_lab: req.body.credits_lab,
-      batch: req.body.batch,
+      semester: req.body.semester,
+      year: req.body.year,
       weightage_theory_ise: req.body.weightage_theory_ise,
       weightage_theory_mse: req.body.weightage_theory_mse,
       weightage_theory_ese: req.body.weightage_theory_ese,
@@ -57,7 +84,7 @@ export const add = async (req, res) => {
       weightage_lab_ese: req.body.weightage_lab_ese,
     })
 
-    recalculateStatistics(course.course_code, course.batch);
+    recalculateStatistics(course.course_code, course.year, course.semester);
 
     return res.status(200).send({
       success: true,
@@ -71,23 +98,46 @@ export const add = async (req, res) => {
   }
 }
 
-export const enrollStudent = async (req, res) => {
+export const deleteCourse = async (req, res) => {
+  const course = await Course.findOne({course_code: req.body.course_code, year: req.body.year, semester: req.body.semester});
+
+  if (!course) {
+    return res.status(404).json({
+      success: false,
+      message: `Could not find course ${req.params.course_code} in ${req.params.year}-${req.params.semester}`
+    })
+  }
+
+  await course.deleteOne(); 
+ 
+  const results = await ExamResult.find({courses: course._id});
+
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    result.courses = result.courses.filter(x => x._id.toString() != course._id.toString())
+    
+    result.result_data.forEach(student => {
+      student.courses[course.course_code] = undefined;
+    })
+
+    await result.save()
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Course deleted successfully" 
+  })
+}  
+  
+export const enrollStudent = async (req, res) => { 
   const uid = req.body.uid;
   const course_code = req.body.course_code;
-  const batch = req.body.batch;
-  const course = await Course.findOne({ course_code, batch }, "enrolled_students course_code batch");
+  const course = await Course.findOne({ course_code, year: req.body.year, semester: req.body.semester }, "enrolled_students course_code year semester");
 
   if (!course) {
     return res.status(404).json({
       success: false,
       message: "That course does not exist"
-    })
-  }
-
-  if (course.scores_locked) {
-    return res.status(400).json({
-      success: false,
-      message: "Scores have already been locked for this course"
     })
   }
 
@@ -116,9 +166,14 @@ export const enrollStudent = async (req, res) => {
   }
   course.enrolled_students.push(enrolledStudent);
 
+  course.enrolled_students.sort((a, b) => (
+    a.uid.localeCompare(b.uid)
+  ))
+
   await course.save()
 
-  recalculateStatistics(course.course_code, course.batch);
+  await recalculateStatistics(course.course_code, course.year, course.semester);
+  await calculateCourseGrades(course.course_code, course.year, course.semester);
 
   res.status(200).json({
     success: true,
@@ -129,20 +184,12 @@ export const enrollStudent = async (req, res) => {
 export const bulkEnrollStudents = async (req, res) => {
   const students = req.body.students;
   const course_code = req.body.course_code;
-  const batch = req.body.batch;
-  const course = await Course.findOne({ course_code, batch }, "enrolled_students course_code batch");
+  const course = await Course.findOne({ course_code, year: req.body.year, semester: req.body.semester }, "enrolled_students course_code batch");
 
   if (!course) {
     return res.status(404).json({
       success: false,
       message: "That course does not exist"
-    })
-  }
-
-  if (course.scores_locked) {
-    return res.status(400).json({
-      success: false,
-      message: "Scores have already been locked for this course"
     })
   }
 
@@ -167,21 +214,23 @@ export const bulkEnrollStudents = async (req, res) => {
     branch: x.branch
   }));
   course.enrolled_students = [...course.enrolled_students, ...enrolledStudents]
+  course.enrolled_students.sort((a, b) => (
+    a.uid.localeCompare(b.uid)
+  ))
 
   await course.save()
   
-  recalculateStatistics(course.course_code, course.batch);
-
+  await recalculateStatistics(course.course_code, course.year, course.semester);
+  await calculateCourseGrades(course.course_code, course.year, course.semester);
+  
   res.status(200).json({
     success: true
   })
 }
 
-export const importGrades = async (req, res) => {
-  const students = req.body.students;
+export const removeStudent = async (req, res) => {
   const course_code = req.body.course_code;
-  const batch = req.body.batch;
-  const course = await Course.findOne({ course_code, batch }, "enrolled_students course_code batch");
+  const course = await Course.findOne({ course_code, year: req.body.year, semester: req.body.semester }, "enrolled_students course_code batch");
 
   if (!course) {
     return res.status(404).json({
@@ -190,7 +239,34 @@ export const importGrades = async (req, res) => {
     })
   }
 
-  if (course.scores_locked) {
+  course.enrolled_students = course.enrolled_students.filter(x => x.uid != req.body.uid);
+  course.enrolled_students.sort((a, b) => (
+    a.uid.localeCompare(b.uid)
+  ))
+
+  await course.save()
+
+  await recalculateStatistics(course.course_code, course.year, course.semester);
+  await calculateCourseGrades(course.course_code, course.year, course.semester);
+  
+  res.status(200).json({
+    success: true
+  })
+}
+
+export const importGrades = async (req, res) => {
+  const students = req.body.students;
+  const course_code = req.body.course_code;
+  const course = await Course.findOne({ course_code, year: req.body.year, semester: req.body.semester }, "enrolled_students course_code year semester");
+
+  if (!course) {
+    return res.status(404).json({
+      success: false,
+      message: "That course does not exist"
+    })
+  }
+
+  if (course.scores_locked && !req.user.admin) {
     return res.status(400).json({
       success: false,
       message: "Scores have already been locked for this course"
@@ -213,6 +289,8 @@ export const importGrades = async (req, res) => {
     studentMap[x.uid] = x;
   });
 
+  let maxScoreError = null;
+
   course.enrolled_students.forEach(x => {
     if (studentMap[x.uid]) {
       const gradeData = studentMap[x.uid];
@@ -222,12 +300,31 @@ export const importGrades = async (req, res) => {
       x.score_lab_ise = gradeData.score_lab_ise ?? x.score_lab_ise;
       x.score_lab_mse = gradeData.score_lab_mse ?? x.score_lab_mse;
       x.score_lab_ese = gradeData.score_lab_ese ?? x.score_lab_ese;
+
+      if (x.score_theory_ise > course.weightage_theory_ise) {  maxScoreError = "Theory ISE" }
+      if (x.score_theory_mse > course.weightage_theory_mse) {  maxScoreError = "Theory MSE" }
+      if (x.score_theory_ese > course.weightage_theory_ese) {  maxScoreError = "Theory ESE" }
+      if (x.score_lab_ise > course.weightage_lab_ise) {  maxScoreError = "Lab ISE" }
+      if (x.score_lab_mse > course.weightage_lab_mse) {  maxScoreError = "Lab MSE" }
+      if (x.score_lab_ese > course.weightage_lab_ese) {  maxScoreError = "Lab ESE" } 
     }
   })
 
+  if (maxScoreError) {
+    return res.status(400).json({
+      success: false,
+      message: `Scores for ${maxScoreError} cannot be greater than the maximum score for that component`
+    })
+  }
+
+  course.enrolled_students.sort((a, b) => (
+    a.uid.localeCompare(b.uid)
+  ))
+
   await course.save()
 
-  recalculateStatistics(course.course_code, course.batch);
+  await recalculateStatistics(course.course_code, course.year, course.semester);
+  await calculateCourseGrades(course.course_code, course.year, course.semester);
 
   res.status(200).json({
     success: true
@@ -237,8 +334,7 @@ export const importGrades = async (req, res) => {
 export const updateGrades = async (req, res) => {
   const uid = req.body.uid;
   const course_code = req.body.course_code;
-  const batch = req.body.batch;
-  const course = await Course.findOne({ course_code, batch });
+  const course = await Course.findOne({ course_code, year: req.body.year, semester: req.body.semester });
 
   if (!course) {
     return res.status(404).json({
@@ -247,7 +343,7 @@ export const updateGrades = async (req, res) => {
     })
   }
 
-  if (course.scores_locked) {
+  if (course.scores_locked && !req.user.admin) {
     return res.status(400).json({
       success: false,
       message: "Scores have already been locked for this course"
@@ -269,6 +365,8 @@ export const updateGrades = async (req, res) => {
   student.score_lab_ise = req.body.score_lab_ise ?? student.score_lab_ise;
   student.score_lab_mse = req.body.score_lab_mse ?? student.score_lab_mse;
   student.score_lab_ese = req.body.score_lab_ese ?? student.score_lab_ese;
+  student.flag_not_present = req.body.flag_not_present ?? false;
+  student.flag_defaulter = req.body.flag_defaulter ?? false;
 
   if (student.score_theory_ise > course.weightage_theory_ise) {
     return res.status(400).json({
@@ -312,10 +410,15 @@ export const updateGrades = async (req, res) => {
     })
   }
 
+  course.enrolled_students.sort((a, b) => (
+    a.uid.localeCompare(b.uid)
+  ))
+
   await course.save()
 
-  recalculateStatistics(course.course_code, course.batch);
-
+  await recalculateStatistics(course.course_code, course.year, course.semester);
+  await calculateCourseGrades(course.course_code, course.year, course.semester);
+  
   res.status(200).json({
     success: true,
     student
@@ -324,63 +427,26 @@ export const updateGrades = async (req, res) => {
 
 export const listStudents = async (req, res) => {
   try {
-    const course = await Course.findOne({course_code: req.params.course_code, batch: req.params.batch}, "enrolled_students");
+    const course = await Course.findOne({course_code: req.params.course_code, year: req.params.year, semester: req.params.semester}, "enrolled_students");
     
     if (!course) {
       return res.status(404).json({
         success: false,
-        message: `Could not find course ${req.params.course_code} in batch ${req.params.batch}`
+        message: `Could not find course ${req.params.course_code} in ${req.params.year}-${req.params.semester}`
       })
     }
 
     res.status(200).json({
       success: true,
-      enrolled_students: course.enrolled_students
+      enrolled_students: course.enrolled_students.sort((a, b) => a.uid.localeCompare(b.uid))
     })
   } catch (error) {
     
   }
 }
 
-export const bulkAdd = async (req, res) => {
-  try {
-    const students = req.body.students;
-    const alreadyExistingStudent = await Student.findOne({uid: {$in: students.map(x => x.uid)}});
-
-    if (alreadyExistingStudent) {
-      return res.status(400).send({
-        success: false,
-        message: `A Student with UID ${alreadyExistingStudent.uid} already exists`
-      })
-    }
-
-    const student = await Student.insertMany(students.map(x => (
-      {
-        name: x.name,
-        email: x.email,
-        uid: x.uid,
-        phone_number: x.phone_number,
-        branch: x.branch,
-        batch: x.batch,
-      }
-    )))
-
-    res.status(200).send({
-      success: true,
-      student
-    })
-
-    recalculateStatistics(course.course_code, course.batch);
-  } catch (error) {
-    return res.status(500).send({
-      success: false,
-      message: error.toString()
-    })
-  }
-}
-
-export const recalculateStatistics = async (course_code, batch) => {
-  const course = await Course.findOne({course_code, batch}, "enrolled_students statistics");
+export const recalculateStatistics = async (course_code, year, semester) => {
+  const course = await Course.findOne({course_code, year, semester}, "enrolled_students statistics");
 
   if (!course) {
     console.log("Course not found in Recalculate Statistics")
@@ -416,12 +482,12 @@ export const recalculateStatistics = async (course_code, batch) => {
 } 
 
 export const getStatistics = async (req, res) => {
-  const course = await Course.findOne({course_code: req.params.course_code, batch: req.params.batch}, "statistics");
+  const course = await Course.findOne({course_code: req.params.course_code, year: req.params.year, semester: req.params.semester}, "statistics");
 
   if (!course) {
     return res.status(404).json({
       success: false,
-      message: `Could not find course ${req.params.course_code} in batch ${req.params.batch}`
+      message: `Could not find course ${req.params.course_code} in ${req.params.year}-${req.params.semester}`
     })
   }
 
@@ -432,12 +498,12 @@ export const getStatistics = async (req, res) => {
 }
 
 export const addFaculty = async (req, res) => {
-  const course = await Course.findOne({course_code: req.body.course_code, batch: req.body.batch});
+  const course = await Course.findOne({course_code: req.body.course_code, year: req.body.year, semester: req.body.semester});
 
   if (!course) {
     return res.status(404).json({
       success: false,
-      message: `Could not find course ${req.body.course_code} in batch ${req.body.batch}`
+      message: `Could not find course ${req.body.course_code} in ${req.body.year}-${req.body.semester}`
     })
   }
 
@@ -474,12 +540,12 @@ export const addFaculty = async (req, res) => {
 }
 
 export const removeFaculty = async (req, res) => {
-  const course = await Course.findOne({course_code: req.body.course_code, batch: req.body.batch});
+  const course = await Course.findOne({course_code: req.body.course_code, year: req.body.year, semester: req.body.semester});
 
   if (!course) {
     return res.status(404).json({
       success: false,
-      message: `Could not find course ${req.body.course_code} in batch ${req.body.batch}`
+      message: `Could not find course ${req.body.course_code} in ${req.body.year}-${req.body.semester}`
     })
   }
 
@@ -503,12 +569,12 @@ export const removeFaculty = async (req, res) => {
 }
 
 export const listFaculties = async (req, res) => {
-  const course = await Course.findOne({course_code: req.params.course_code, batch: req.params.batch}, "faculty");
+  const course = await Course.findOne({course_code: req.params.course_code, year: req.params.year, semester: req.params.semester}, "faculty");
 
   if (!course) {
     return res.status(404).json({
       success: false,
-      message: `Could not find course ${req.params.course_code} in batch ${req.params.batch}`
+      message: `Could not find course ${req.params.course_code} in ${req.params.year}-${req.params.semester}`
     })
   }
 
@@ -519,23 +585,25 @@ export const listFaculties = async (req, res) => {
 }
 
 export const lockMarks = async (req, res) => {
-  const course = await Course.findOne({course_code: req.body.course_code, batch: req.body.batch});
+  const course = await Course.findOne({course_code: req.body.course_code, year: req.body.year, semester: req.body.semester});
 
   if (!course) {
     return res.status(404).json({
       success: false,
-      message: `Could not find course ${req.body.course_code} in batch ${req.body.batch}`
+      message: `Could not find course ${req.body.course_code} in ${req.body.year}-${req.body.semester}`
     })
   }
 
-  if (course.scores_locked) {
+  const flag = req.body.locked;
+
+  if (course.scores_locked == flag) {
     return res.status(400).json({
       success: false,
-      message: `Scores for course ${req.body.course_code} in batch ${req.body.batch} are already locked`
+      message: `Scores for course ${req.body.course_code} in ${req.body.year}-${req.body.semester} are already ${flag ? "locked" : "unlocked"}`
     })
   }
 
-  course.scores_locked = true;
+  course.scores_locked = flag;
   course.scores_locked_by = {
     email: req.user.email,
     name: req.user.name,
@@ -547,31 +615,31 @@ export const lockMarks = async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: `Scores for course ${req.body.course_code} in batch ${req.body.batch} are locked`
+    message: `Scores for course ${req.body.course_code} in ${req.body.year}-${req.body.semester} are ${flag ? "locked" : "unlocked"}`
   })
 }
 
 export const lockGrades = async (req, res) => {
-  const course = await Course.findOne({course_code: req.body.course_code, batch: req.body.batch});
+  const course = await Course.findOne({course_code: req.body.course_code, year: req.body.year, semester: req.body.semester});
   
   if (!course) {
     return res.status(404).json({
       success: false,
-      message: `Could not find course ${req.body.course_code} in batch ${req.body.batch}`
+      message: `Could not find course ${req.body.course_code} in ${req.body.year}-${req.body.semester}`
     })
   }
 
   if (course.grades_locked) {
     return res.status(400).json({
       success: false,
-      message: `Grades for course ${req.body.course_code} in batch ${req.body.batch} are already locked`
+      message: `Grades for course ${req.body.course_code} in ${req.body.year}-${req.body.semester} are already locked`
     })
   }
 
   if (!course.scores_locked) {
     return res.status(400).json({
       success: false,
-      message: `Scores for course ${req.body.course_code} in batch ${req.body.batch} should be locked before locking grades`
+      message: `Scores for course ${req.body.course_code} in ${req.body.year}-${req.body.semester} should be locked before locking grades`
     })
   }
 
@@ -587,24 +655,17 @@ export const lockGrades = async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: `Grades for course ${req.body.course_code} in batch ${req.body.batch} are locked`
+    message: `Grades for course ${req.body.course_code} in ${req.body.year}-${req.body.semester} are locked`
   })
 }
 
 export const setSaScore = async (req, res) => {
-  const course = await Course.findOne({course_code: req.body.course_code, batch: req.body.batch});
+  const course = await Course.findOne({course_code: req.body.course_code, year: req.body.year, semester: req.body.semester});
   
   if (!course) {
     return res.status(404).json({
       success: false,
-      message: `Could not find course ${req.body.course_code} in batch ${req.body.batch}`
-    })
-  }
-
-  if (course.grades_locked) {
-    return res.status(400).json({
-      success: false,
-      message: `Grades for course ${req.body.course_code} in batch ${req.body.batch} are already locked`
+      message: `Could not find course ${req.body.course_code} in ${req.body.year}-${req.body.semester}`
     })
   }
 
@@ -613,6 +674,52 @@ export const setSaScore = async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: `SA score for course ${req.body.course_code} in batch ${req.body.batch} is set`
+    message: `SA score for course ${req.body.course_code} in ${req.body.year}-${req.body.semester} is set`
   })
+
+  calculateCourseGrades(course.course_code, course.year, course.semester);
 }
+
+export const calculateCourseGrades = async (course_code, year, semester) => {
+  const course = await Course.findOne({course_code, year, semester});
+  if (!course || course.enrolled_students.length == 0) return;
+  if (['core', 'open-elective', 'program-elective'].includes(course.course_type) && !course.sa_score) return;
+
+  const students = course.enrolled_students;
+  course.enrolled_students = calculateGrades(students, course);
+
+  await course.save();
+}
+
+export const updateCourse = async (req, res) => {
+  const course = await Course.findOne({_id: req.params.id});
+
+  if (!course) {
+    return res.status(404).json({
+      success: false,
+      message: `Could not find course with id ${req.params.id}`
+    })
+  }
+
+  course.course_code = req.body.course_code ?? course.course_code;
+  course.name = req.body.name ?? course.name;
+  course.course_type = req.body.course_type ?? course.course_type;
+  course.credits_theory = req.body.credits_theory ?? course.credits_theory;
+  course.credits_lab = req.body.credits_lab ?? course.credits_lab;
+  course.weightage_theory_ise = req.body.weightage_theory_ise ?? course.weightage_theory_ise;
+  course.weightage_theory_mse = req.body.weightage_theory_mse ?? course.weightage_theory_mse;
+  course.weightage_theory_ese = req.body.weightage_theory_ese ?? course.weightage_theory_ese;
+  course.weightage_lab_ise = req.body.weightage_lab_ise ?? course.weightage_lab_ise;
+  course.weightage_lab_mse = req.body.weightage_lab_mse ?? course.weightage_lab_mse;
+  course.weightage_lab_ese = req.body.weightage_lab_ese ?? course.weightage_lab_ese;
+  course.year = req.body.year ?? course.year;
+  course.semester = req.body.semester ?? course.semester;
+
+  await course.save();
+
+  res.status(200).json({
+    success: true,
+    message: `Course ${req.params.id} updated`,
+    course
+  });
+} 
