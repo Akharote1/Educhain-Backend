@@ -22,6 +22,7 @@ router.post('/register',
   body('email').isEmail().toLowerCase().trim(),
   body('phone_number').isString(),
   body('password').isString(),
+  body('publicAddress').isString(),
   body('admin').optional().isBoolean().default(false),
   validateInput,
   FacultyController.register

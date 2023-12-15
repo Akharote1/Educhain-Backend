@@ -24,6 +24,8 @@ export const register = async (req, res) => {
     email: req.body.email,
     password_hash: passwordHash,
     phone_number: req.body.phone_number,
+    publicAddress: req.body.publicAddress,
+    nonce: Math.floor(Math.random() * 1000000),
     password: passwordHash
   })
 
@@ -76,6 +78,66 @@ export const login = async (req, res) => {
       message: 'An error occurred.'
     })
   }
+}
+
+export const getNonce = async (req, res) => {
+  try {
+    const user = await Faculty.findOne({publicAddress: req.body.publicAddress.toLowerCase()})
+
+    if(!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid publicAddress'
+      })
+    }
+
+    return res.status(200).json({
+      success: true,
+      nonce: user.nonce,
+      publicAddress: user.publicAddress
+    })
+
+  } catch (err) {
+    console.log(err)
+
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred.'
+    })
+  }
+
+}
+
+export const blockchainLogin = async (req, res) => {
+  try {
+    const user = await Faculty.findOne({publicAddress: req.body.publicAddress.toLowerCase()})
+
+    if(!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid publicAddress'
+      })
+    }
+
+    const signature = req.body.signature;
+
+    
+
+    return res.status(200).json({
+      success: true,
+      token: token,
+      user: user
+    })
+
+  } catch (err) {
+    console.log(err)
+
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred.'
+    })
+  }
+
 }
 
 export const verify = async (req, res) => {

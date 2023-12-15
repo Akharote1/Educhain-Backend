@@ -29,7 +29,15 @@ const facultySchema = new mongoose.Schema({
 	courses: [{
 		type: mongoose.SchemaTypes.ObjectId,
 		ref: "Course"
-	}]
+	}],
+	nonce: {
+		type: Number,
+		required: false
+	},
+	publicAddress: {
+		type: String,
+		required: false
+	}
 })
 
 export default connection.model('Faculty', facultySchema)
