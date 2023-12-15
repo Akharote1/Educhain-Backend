@@ -1,8 +1,11 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("@nomicfoundation/hardhat-ethers");
+require('dotenv').config()
 
 /** @type import('hardhat/config').HardhatUserConfig */
 const GANACHE_RPC_URL = "HTTP://127.0.0.1:7545";
+
+const GANACHE_MNEMONIC = process.env.GANACHE_MNEMONIC;
 
 module.exports = {
   networks: {
@@ -16,7 +19,7 @@ module.exports = {
     ganache: {
       accounts: {
         mnemonic:
-          "hazard eagle supreme stand between swallow weapon cousin action shoot clock emerge",
+        GANACHE_MNEMONIC,
       },
       // accounts: [
       //   `0xc7c990bf2cedab83a47afda3b02d90f627330ada1e1b86d43253f3b39e66c96b`,
