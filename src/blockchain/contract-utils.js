@@ -14,13 +14,6 @@ export const createPendingTransaction = async ({
   const contract = new web3.eth.Contract(contractAbi, address);
   const data = contract.methods[functionName](...params).encodeABI();
 
-  web3.eth.sendTransaction({
-    from,
-    to: address,
-    gas: "100000000",
-    data: data,
-  })
-
   return {
     from,
     to: address,

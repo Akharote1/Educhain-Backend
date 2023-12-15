@@ -21,8 +21,8 @@ router.post('/add',
   body('branch').isString(),
   body('batch').isInt(),
   validateInput,
-  authenticate,
-  adminCheck,
+  // authenticate,
+  // adminCheck,
   StudentController.add
 )
 

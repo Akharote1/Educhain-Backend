@@ -1,15 +1,21 @@
+import Web3 from "web3";
 import { createPendingTransaction } from "../blockchain/contract-utils.js";
 import Student from "./../models/Student.js";
 
 export const list = async (req, res) => {
+  const web3 = new Web3("http://localhost/7545/");
   const pendingTransaction = createPendingTransaction({
     networkId: req?.body?.networkId,
-    functionName: 'getStudents',
+    functionName: "addStudent",
     params: [2024, "COMPS"],
     from: req?.body?.userAddress,
   });
 
-  return res.status(200).json({ pendingTransaction });
+  const result = await web3.eth.call(pendingTransaction);
+
+  console.log(pendingTransaction);
+
+  return res.status(200).json({ result });
 
   const limit = req.query.limit ?? 100;
   const page = req.query.page ?? 1;
@@ -77,21 +83,60 @@ export const get = async (req, res) => {
 
 export const add = async (req, res) => {
   try {
-    if (await Student.findOne({ uid: req.body.uid })) {
-      return res.status(400).send({
-        success: false,
-        message: "A Student with that UID already exists",
-      });
-    }
+    // if (await Student.findOne({ uid: req.body.uid })) {
+    //   return res.status(400).send({
+    //     success: false,
+    //     message: "A Student with that UID already exists",
+    //   });
+    // }
 
-    const student = await Student.create({
-      name: req.body.name,
-      email: req.body.email,
-      uid: req.body.uid,
-      phone_number: req.body.phone_number,
-      branch: req.body.branch,
-      batch: req.body.batch,
+    const params = req?.body;
+
+    const pendingTransaction = createPendingTransaction({
+      networkId: req?.body?.networkId,
+      functionName: "addStudent",
+      params: [
+        params?.uid,
+        params?.name,
+        params?.branch,
+        params?.currentSemester,
+        params?.batch,
+        params?.phone_number,
+        params?.email,
+      ],
+      from: params?.userAddress,
     });
+
+    const web3 = new Web3("http://127.0.0.1/7545");
+
+    // const nonce = await web3.eth.getTransactionCount(params?.userAddress);
+
+    // // Include the nonce in the transaction object
+    // pendingTransaction.nonce = nonce;
+
+
+    var privKey = new Buffer("0x731036bd51cecd3a3b3c94c0d48505b15ed83233fd0a638aeb6a2bdcb21f346f", 'hex')
+    var tx = new Tx(pendingTransaction)
+    tx.sign(privKey)
+
+    // const signedTransaction = await web3.eth.accounts.signTransaction(
+    //   pendingTransaction,
+    //   "0x731036bd51cecd3a3b3c94c0d48505b15ed83233fd0a638aeb6a2bdcb21f346f"
+    // );
+
+    console.log("signed", signedTransaction);
+
+    const student = await web3.eth.call(signedTransaction);
+    console.log(student);
+
+    // const student = await Student.create({
+    //   name: req.body.name,
+    //   email: req.body.email,
+    //   uid: req.body.uid,
+    //   phone_number: req.body.phone_number,
+    //   branch: req.body.branch,
+    //   batch: req.body.batch,
+    // });
 
     return res.status(200).send({
       success: true,
