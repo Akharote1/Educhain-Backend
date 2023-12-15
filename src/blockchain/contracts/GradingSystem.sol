@@ -81,8 +81,8 @@ contract GradingSystem is ERC721URIStorage {
         string calldata _branch,
         uint256 _currentSemester,
         uint256 _batch,
-        string _phone,
-        string _email
+        string calldata _phone,
+        string calldata _email
     ) external {
         Student memory _newStudent = Student({
             uid: _uid,
@@ -129,12 +129,12 @@ contract GradingSystem is ERC721URIStorage {
             theoryESEWeightage: _theoryESEWeightage,
             labISEWeightage: _labISEWeightage,
             labMSEWeightage: _labMSEWeightage,
-            labESEWEightage: _labESEWeightage,
+            labESEWeightage: _labESEWeightage,
             saScore: 90,
             areMarksLocked: courseMarksLockedState.OPEN,
             students: new string[](0)
         });
-        s_courses[_courseId] = _name;
+        s_courses[_courseId] = _newCourse;
         s_courseIds.push(_courseId);
     }
 
@@ -181,7 +181,7 @@ contract GradingSystem is ERC721URIStorage {
     }
 
     function lockCourseMarks(string calldata _courseId) external onlyAdmin {
-        s_courses[_courseId].areCourseMarksLocked = courseMarksLockedState
+        s_courses[_courseId].areMarksLocked = courseMarksLockedState
             .LOCKED;
     }
 
@@ -194,21 +194,15 @@ contract GradingSystem is ERC721URIStorage {
     function getStudents(
         uint256 _batch,
         string memory _branch
-    ) external view returns (uint256[] memory) {
+    ) external view returns (string[] memory) {
         return s_studentIds[_batch][_branch];
-    }
-
-    function getCourse(
-        string calldata _courseId
-    ) external view returns (string memory) {
-        return s_courses[_courseId];
     }
 
     function getCourses() external view returns (string[] memory) {
         return s_courseIds;
     }
 
-    function getCourseMarks(
+    function getStudentCourseMarks(
         string calldata _uid,
         string calldata _courseId
     ) external view returns (uint256) {
