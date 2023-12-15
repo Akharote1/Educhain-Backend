@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "@elastic/elasticsearch": "^8.7.0",
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
     "@openzeppelin/contracts": "^5.0.0",
     "bcrypt": "^5.1.0",
     "bcryptjs": "^2.4.3",

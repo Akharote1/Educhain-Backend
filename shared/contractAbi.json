@@ -1,0 +1,432 @@
+[
+  {
+    "type": "constructor",
+    "stateMutability": "undefined",
+    "payable": false,
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ERC721IncorrectOwner",
+    "inputs": [
+      { "type": "address", "name": "sender" },
+      { "type": "uint256", "name": "tokenId" },
+      { "type": "address", "name": "owner" }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ERC721InsufficientApproval",
+    "inputs": [
+      { "type": "address", "name": "operator" },
+      { "type": "uint256", "name": "tokenId" }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ERC721InvalidApprover",
+    "inputs": [{ "type": "address", "name": "approver" }]
+  },
+  {
+    "type": "error",
+    "name": "ERC721InvalidOperator",
+    "inputs": [{ "type": "address", "name": "operator" }]
+  },
+  {
+    "type": "error",
+    "name": "ERC721InvalidOwner",
+    "inputs": [{ "type": "address", "name": "owner" }]
+  },
+  {
+    "type": "error",
+    "name": "ERC721InvalidReceiver",
+    "inputs": [{ "type": "address", "name": "receiver" }]
+  },
+  {
+    "type": "error",
+    "name": "ERC721InvalidSender",
+    "inputs": [{ "type": "address", "name": "sender" }]
+  },
+  {
+    "type": "error",
+    "name": "ERC721NonexistentToken",
+    "inputs": [{ "type": "uint256", "name": "tokenId" }]
+  },
+  { "type": "error", "name": "GradingSystem__AdminOnly", "inputs": [] },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "Approval",
+    "inputs": [
+      { "type": "address", "name": "owner", "indexed": true },
+      { "type": "address", "name": "approved", "indexed": true },
+      { "type": "uint256", "name": "tokenId", "indexed": true }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "ApprovalForAll",
+    "inputs": [
+      { "type": "address", "name": "owner", "indexed": true },
+      { "type": "address", "name": "operator", "indexed": true },
+      { "type": "bool", "name": "approved", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "BatchMetadataUpdate",
+    "inputs": [
+      { "type": "uint256", "name": "_fromTokenId", "indexed": false },
+      { "type": "uint256", "name": "_toTokenId", "indexed": false }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "MetadataUpdate",
+    "inputs": [{ "type": "uint256", "name": "_tokenId", "indexed": false }]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "Transfer",
+    "inputs": [
+      { "type": "address", "name": "from", "indexed": true },
+      { "type": "address", "name": "to", "indexed": true },
+      { "type": "uint256", "name": "tokenId", "indexed": true }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "addCourse",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      { "type": "string", "name": "_courseId" },
+      { "type": "string", "name": "_courseCode" },
+      { "type": "string", "name": "_courseName" },
+      { "type": "uint256", "name": "_year" },
+      { "type": "uint256", "name": "_semester" },
+      { "type": "uint256", "name": "_theoryCredits" },
+      { "type": "uint256", "name": "_labCredits" },
+      { "type": "uint256", "name": "_theoryISEWeightage" },
+      { "type": "uint256", "name": "_theoryMSEWeightage" },
+      { "type": "uint256", "name": "_theoryESEWeightage" },
+      { "type": "uint256", "name": "_labISEWeightage" },
+      { "type": "uint256", "name": "_labMSEWeightage" },
+      { "type": "uint256", "name": "_labESEWeightage" }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "addCourseMarks",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      { "type": "string", "name": "_uid" },
+      { "type": "string", "name": "_courseId" },
+      { "type": "uint256", "name": "_marks" }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "addCourseToStudent",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      { "type": "string", "name": "_uid" },
+      { "type": "uint256", "name": "_semester" },
+      { "type": "string", "name": "_courseId" }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "addSGPA",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      { "type": "string", "name": "_uid" },
+      { "type": "uint256", "name": "_semester" },
+      { "type": "uint256", "name": "_sgpa" }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "addStudent",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      { "type": "string", "name": "_uid" },
+      { "type": "string", "name": "_name" },
+      { "type": "string", "name": "_branch" },
+      { "type": "uint256", "name": "_currentSemester" },
+      { "type": "uint256", "name": "_batch" },
+      { "type": "string", "name": "_phone" },
+      { "type": "string", "name": "_email" }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "approve",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      { "type": "address", "name": "to" },
+      { "type": "uint256", "name": "tokenId" }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "balanceOf",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [{ "type": "address", "name": "owner" }],
+    "outputs": [{ "type": "uint256", "name": "" }]
+  },
+  {
+    "type": "function",
+    "name": "getApproved",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [{ "type": "uint256", "name": "tokenId" }],
+    "outputs": [{ "type": "address", "name": "" }]
+  },
+  {
+    "type": "function",
+    "name": "getCourseDetails",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [{ "type": "string", "name": "_courseId" }],
+    "outputs": [
+      {
+        "type": "tuple",
+        "name": "",
+        "components": [
+          { "type": "string", "name": "courseId" },
+          { "type": "string", "name": "courseCode" },
+          { "type": "string", "name": "courseName" },
+          { "type": "uint256", "name": "year" },
+          { "type": "uint8", "name": "semester" },
+          { "type": "uint256", "name": "theoryCredits" },
+          { "type": "uint256", "name": "labCredits" },
+          { "type": "uint256", "name": "theoryISEWeightage" },
+          { "type": "uint256", "name": "theoryMSEWeightage" },
+          { "type": "uint256", "name": "theoryESEWeightage" },
+          { "type": "uint256", "name": "labISEWeightage" },
+          { "type": "uint256", "name": "labMSEWeightage" },
+          { "type": "uint256", "name": "labESEWeightage" },
+          { "type": "uint256", "name": "saScore" },
+          { "type": "uint8", "name": "areMarksLocked" },
+          { "type": "string[]", "name": "students" }
+        ]
+      }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "getCourses",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [],
+    "outputs": [{ "type": "string[]", "name": "" }]
+  },
+  {
+    "type": "function",
+    "name": "getStudent",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [{ "type": "string", "name": "_uid" }],
+    "outputs": [
+      {
+        "type": "tuple",
+        "name": "",
+        "components": [
+          { "type": "string", "name": "name" },
+          { "type": "string", "name": "branch" },
+          { "type": "string", "name": "uid" },
+          { "type": "uint256", "name": "batch" },
+          { "type": "string", "name": "email" },
+          { "type": "string", "name": "phone" },
+          { "type": "uint256", "name": "cgpa" },
+          { "type": "uint256[]", "name": "sgpa" },
+          { "type": "uint256[]", "name": "scorecards" },
+          { "type": "uint256", "name": "currentSemester" },
+          { "type": "string[][]", "name": "semCourses" }
+        ]
+      }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "getStudentCourseMarks",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [
+      { "type": "string", "name": "_uid" },
+      { "type": "string", "name": "_courseId" }
+    ],
+    "outputs": [{ "type": "uint256", "name": "" }]
+  },
+  {
+    "type": "function",
+    "name": "getStudents",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [
+      { "type": "uint256", "name": "_batch" },
+      { "type": "string", "name": "_branch" }
+    ],
+    "outputs": [{ "type": "string[]", "name": "" }]
+  },
+  {
+    "type": "function",
+    "name": "isApprovedForAll",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [
+      { "type": "address", "name": "owner" },
+      { "type": "address", "name": "operator" }
+    ],
+    "outputs": [{ "type": "bool", "name": "" }]
+  },
+  {
+    "type": "function",
+    "name": "lockCourseMarks",
+    "constant": false,
+    "payable": false,
+    "inputs": [{ "type": "string", "name": "_courseId" }],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "name",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [],
+    "outputs": [{ "type": "string", "name": "" }]
+  },
+  {
+    "type": "function",
+    "name": "ownerOf",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [{ "type": "uint256", "name": "tokenId" }],
+    "outputs": [{ "type": "address", "name": "" }]
+  },
+  {
+    "type": "function",
+    "name": "safeTransferFrom",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      { "type": "address", "name": "from" },
+      { "type": "address", "name": "to" },
+      { "type": "uint256", "name": "tokenId" }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "safeTransferFrom",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      { "type": "address", "name": "from" },
+      { "type": "address", "name": "to" },
+      { "type": "uint256", "name": "tokenId" },
+      { "type": "bytes", "name": "data" }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "setApprovalForAll",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      { "type": "address", "name": "operator" },
+      { "type": "bool", "name": "approved" }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "supportsInterface",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [{ "type": "bytes4", "name": "interfaceId" }],
+    "outputs": [{ "type": "bool", "name": "" }]
+  },
+  {
+    "type": "function",
+    "name": "symbol",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [],
+    "outputs": [{ "type": "string", "name": "" }]
+  },
+  {
+    "type": "function",
+    "name": "tokenURI",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [{ "type": "uint256", "name": "tokenId" }],
+    "outputs": [{ "type": "string", "name": "" }]
+  },
+  {
+    "type": "function",
+    "name": "transferFrom",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      { "type": "address", "name": "from" },
+      { "type": "address", "name": "to" },
+      { "type": "uint256", "name": "tokenId" }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "updateCGPA",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      { "type": "string", "name": "_uid" },
+      { "type": "uint256", "name": "_cgpa" }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "uploadScorecard",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      { "type": "string", "name": "_uid" },
+      { "type": "uint256", "name": "_semester" },
+      { "type": "string", "name": "_scorecardURI" }
+    ],
+    "outputs": []
+  }
+]
